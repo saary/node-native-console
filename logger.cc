@@ -12,8 +12,10 @@ Handle<Value> Log(const Arguments& args) {
 
   if (args.Length() > 0) 
   {
-      console.Log(args[0]->ToString());    
+    console.Log(args[0]->ToString());    
   }
+  
+  console.Log(L"just another.");    
 
   return scope.Close(Undefined());
 }

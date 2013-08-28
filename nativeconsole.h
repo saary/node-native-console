@@ -9,6 +9,27 @@ namespace NodeUtils
   public:
     Console()
     {
+      ConnectToJSConsole();
+    }
+
+    ~Console()
+    {
+      Dispose();
+    }
+
+    void Log(Handle<String> str) { Log(_log, str); }
+    void Log(wchar_t *wstr) { Log(_log, wstr); }
+    void Info(Handle<String> str) { Log(_info, str); }
+    void Info(wchar_t *wstr) { Log(_info, wstr); }
+    void Warn(Handle<String> str) { Log(_warn, str); }
+    void Warn(wchar_t *wstr) { Log(_warn, wstr); }
+    void Error(Handle<String> str) { Log(_error, str); }
+    void Error(wchar_t *wstr) { Log(_error, wstr); }
+
+    void ConnectToJSConsole()
+    {
+      Dispose();
+
       HandleScope scope;
 
       _console = Persistent<Object>::New(Context::GetCurrent()->Global()->Get(String::NewSymbol("console")).As<Object>());
@@ -21,7 +42,8 @@ namespace NodeUtils
       }
     }
 
-    ~Console()
+  private:
+    void Dispose()
     {
       _console.Dispose();
       _log.Dispose();
@@ -30,12 +52,13 @@ namespace NodeUtils
       _error.Dispose();
     }
 
-    void Log(Handle<String> str) { Log(_log, str); }
-    void Info(Handle<String> str) { Log(_info, str); }
-    void Warn(Handle<String> str) { Log(_warn, str); }
-    void Error(Handle<String> str) { Log(_error, str); }
+    void Log(Handle<Function>& logFunction, wchar_t *wstr)
+    {
+      HandleScope scope;
+      Local<String> str = String::New(wstr);
+      Log(logFunction, str);
+    }
 
-  private:
     void Log(Handle<Function>& logFunction, Handle<String>& str)
     {
       if (!logFunction.IsEmpty())
