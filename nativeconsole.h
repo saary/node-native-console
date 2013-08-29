@@ -1,9 +1,10 @@
 #include <v8.h>
 
-using namespace v8;
 
 namespace NodeUtils
 {
+  using namespace v8;
+
   class Console 
   {
   public:
@@ -18,13 +19,13 @@ namespace NodeUtils
     }
 
     void Log(Handle<String> str) { Log(_log, str); }
-    void Log(wchar_t *wstr) { Log(_log, wstr); }
+    void Log(const wchar_t *wstr) { Log(_log, wstr); }
     void Info(Handle<String> str) { Log(_info, str); }
-    void Info(wchar_t *wstr) { Log(_info, wstr); }
+    void Info(const wchar_t *wstr) { Log(_info, wstr); }
     void Warn(Handle<String> str) { Log(_warn, str); }
-    void Warn(wchar_t *wstr) { Log(_warn, wstr); }
+    void Warn(const wchar_t *wstr) { Log(_warn, wstr); }
     void Error(Handle<String> str) { Log(_error, str); }
-    void Error(wchar_t *wstr) { Log(_error, wstr); }
+    void Error(const wchar_t *wstr) { Log(_error, wstr); }
 
     void ConnectToJSConsole()
     {
@@ -52,7 +53,7 @@ namespace NodeUtils
       _error.Dispose();
     }
 
-    void Log(Handle<Function>& logFunction, wchar_t *wstr)
+    void Log(Handle<Function>& logFunction, const wchar_t *wstr)
     {
       HandleScope scope;
       Local<String> str = String::New(wstr);
