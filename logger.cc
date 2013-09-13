@@ -12,7 +12,7 @@ Handle<Value> Log(const Arguments& args) {
 
   if (args.Length() > 0) 
   {
-    console.Log(args[0]->ToString());    
+    console.Log(*String::Value(args[0]));    
   }
   
   console.Log(L"just another.");    
