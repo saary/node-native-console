@@ -1,13 +1,10 @@
 #include <v8.h>
-
-using namespace v8;
-void logUvAsyncCb(uv_async_t *, int);
-void infoUvAsyncCb(uv_async_t *, int);
-void warnUvAsyncCb(uv_async_t *, int);
-void errorUvAsyncCb(uv_async_t *, int);
+#include <uv.h>
+#include <functional>
 
 namespace NodeUtils
 {
+  using namespace v8;
 
   class Console 
   {
@@ -15,7 +12,7 @@ namespace NodeUtils
     Console()
     {
       ConnectToJSConsole();
-      SetupThreadMessageReceivers();
+      _uvMain = uv_thread_self();
     }
 
     ~Console()
@@ -23,73 +20,11 @@ namespace NodeUtils
       Dispose();
     }
 
-	// may only be called from main (event loop) thread
-    void Log(Handle<String> str)
-    {
-      if (uvThreadID != GetCurrentThreadId()) return; // other threads may not pass in Handles (like, Local<>)
-      Log(_log, str); 
-    }
-    
-	// may be called from main thread or worker threads / RT event threads
-    void Log(const wchar_t* str)
-    {
-      if (uvThreadID == GetCurrentThreadId()) {
-        Log(_log, String::New(str));
-      } else {
-		// 
-		_logUvAsync.data = (void *)_wcsdup(str);
-        uv_async_send(&_logUvAsync);
-      }
-    }
-
-    void Info(Handle<String> str)
-    {
-      if (uvThreadID != GetCurrentThreadId()) return;
-      Log(_info, str); 
-    }
-    
-    void Info(const wchar_t* str)
-    {
-      if (uvThreadID == GetCurrentThreadId()) {
-        Log(_info, String::New(str));
-      } else {
-		// dup string so caller can delete[] it.
-		// duped string is deleted by main thread
-        _infoUvAsync.data = (void *)_wcsdup(str);
-        uv_async_send(&_infoUvAsync);
-      }
-    }
-
-    void Warn(Handle<String> str)
-    {
-      if (uvThreadID != GetCurrentThreadId()) return; 
-      Log(_warn, str); 
-    }
-    
-    void Warn(const wchar_t* str)
-    {
-      if (uvThreadID == GetCurrentThreadId()) {
-        Log(_warn, String::New(str));
-      } else {
-        _warnUvAsync.data = (void *)_wcsdup(str);
-        uv_async_send(&_warnUvAsync);
-      }
-    }
-
-    void Error(Handle<String> str)
-    {
-      if (uvThreadID != GetCurrentThreadId()) return;
-      Log(_error, str); 
-    }
-    void Error(const wchar_t* str)
-    {
-      if (uvThreadID == GetCurrentThreadId()) {
-        Log(_error, String::New(str));
-      } else {
-        _errorUvAsync.data = (void *)_wcsdup(str);
-        uv_async_send(&_errorUvAsync);
-      }
-    }
+    // may be called from main thread or worker threads / RT event threads
+    void Log(const wchar_t *wstr) { RunOnMain(new std::function<void ()>([&] { Log(_log, wstr); })); }
+    void Info(const wchar_t *wstr) { RunOnMain(new std::function<void ()>([&] { Log(_info, wstr); })); }
+    void Warn(const wchar_t *wstr) { RunOnMain(new std::function<void ()>([&] { Log(_warn, wstr); })); }
+    void Error(const wchar_t *wstr) { RunOnMain(new std::function<void ()>([&] { Log(_error, wstr); })); }
 
     void ConnectToJSConsole()
     {
@@ -105,15 +40,6 @@ namespace NodeUtils
         _warn = Persistent<Function>::New(_console->Get(String::NewSymbol("warn")).As<Function>());
         _error = Persistent<Function>::New(_console->Get(String::NewSymbol("error")).As<Function>());
       }
-    }
-    
-    void SetupThreadMessageReceivers()
-    {
-      uv_async_init(uv_default_loop(), &_logUvAsync, logUvAsyncCb);
-      uv_async_init(uv_default_loop(), &_infoUvAsync, infoUvAsyncCb);
-      uv_async_init(uv_default_loop(), &_warnUvAsync, warnUvAsyncCb);
-      uv_async_init(uv_default_loop(), &_errorUvAsync, errorUvAsyncCb);
-      uvThreadID = GetCurrentThreadId(); // the constructor is being called from the main (event-loop) thread.
     }
 
   private:
@@ -145,46 +71,38 @@ namespace NodeUtils
       }
     }
 
+    void RunOnMain(std::function<void ()> *func)
+    {
+      if (_uvMain == uv_thread_self()) 
+      {
+        (*func)();
+        delete func;
+      }
+      else
+      {
+        uv_async_t *async = new uv_async_t;
+        uv_async_init(uv_default_loop(), async, AsyncCb);
+        async->data = func;
+        uv_async_send(async);
+      }
+    }
+
+    static void AsyncCb(uv_async_t *handle, int status)
+    {
+      auto func = static_cast<std::function<void ()>*>(handle->data);
+      (*func)();
+      delete func;
+      delete handle;
+    }
+
   private:
     Persistent<Object> _console;
     Persistent<Function> _log;
     Persistent<Function> _info;
     Persistent<Function> _warn;
     Persistent<Function> _error;
-    DWORD uvThreadID;
-    uv_async_t _logUvAsync;
-    uv_async_t _infoUvAsync;
-    uv_async_t _warnUvAsync;
-    uv_async_t _errorUvAsync;
+    unsigned long _uvMain;
   };
 }
 
-//needed for functions below
-static NodeUtils::Console console;
-
-/* Helper functions running in the main thread that receive the 
- * string to be printed from a different thread */
-void logUvAsyncCb(uv_async_t *handle, int status)
-{
-  console.Log(String::New((wchar_t *)(handle->data)));
-  delete[] (wchar_t *)(handle->data);
-}
-
-void infoUvAsyncCb(uv_async_t *handle, int status)
-{
-  console.Info(String::New((wchar_t *)(handle->data)));
-  delete[] (wchar_t *)(handle->data);
-}
-
-void warnUvAsyncCb(uv_async_t *handle, int status)
-{
-  console.Warn(String::New((wchar_t *)(handle->data)));
-  delete[] (wchar_t *)(handle->data);
-}
-
-void errorUvAsyncCb(uv_async_t *handle, int status)
-{
-  console.Error(String::New((wchar_t *)(handle->data)));
-  delete[] (wchar_t *)(handle->data);
-}
 
