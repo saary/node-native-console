@@ -23,18 +23,21 @@ namespace NodeUtils
       Dispose();
     }
 
+	// may only be called from main (event loop) thread
     void Log(Handle<String> str)
     {
       if (uvThreadID != GetCurrentThreadId()) return; // other threads may not pass in Handles (like, Local<>)
       Log(_log, str); 
     }
     
-    void Log(const wchar_t* data)
+	// may be called from main thread or worker threads / RT event threads
+    void Log(const wchar_t* str)
     {
       if (uvThreadID == GetCurrentThreadId()) {
-        Log(_log, String::New(data));
+        Log(_log, String::New(str));
       } else {
-        _logUvAsync.data = (void *)data;
+		// 
+		_logUvAsync.data = (void *)_wcsdup(str);
         uv_async_send(&_logUvAsync);
       }
     }
@@ -50,7 +53,9 @@ namespace NodeUtils
       if (uvThreadID == GetCurrentThreadId()) {
         Log(_info, String::New(str));
       } else {
-        _infoUvAsync.data = (void *)str;
+		// dup string so caller can delete[] it.
+		// duped string is deleted by main thread
+        _infoUvAsync.data = (void *)_wcsdup(str);
         uv_async_send(&_infoUvAsync);
       }
     }
@@ -66,7 +71,7 @@ namespace NodeUtils
       if (uvThreadID == GetCurrentThreadId()) {
         Log(_warn, String::New(str));
       } else {
-        _warnUvAsync.data = (void *)str;
+        _warnUvAsync.data = (void *)_wcsdup(str);
         uv_async_send(&_warnUvAsync);
       }
     }
@@ -81,7 +86,7 @@ namespace NodeUtils
       if (uvThreadID == GetCurrentThreadId()) {
         Log(_error, String::New(str));
       } else {
-        _errorUvAsync.data = (void *)str;
+        _errorUvAsync.data = (void *)_wcsdup(str);
         uv_async_send(&_errorUvAsync);
       }
     }
@@ -161,21 +166,25 @@ static NodeUtils::Console console;
  * string to be printed from a different thread */
 void logUvAsyncCb(uv_async_t *handle, int status)
 {
-	console.Log(String::New((wchar_t *)(handle->data)));
+  console.Log(String::New((wchar_t *)(handle->data)));
+  delete[] (wchar_t *)(handle->data);
 }
 
 void infoUvAsyncCb(uv_async_t *handle, int status)
 {
-	console.Info(String::New((wchar_t *)(handle->data)));
+  console.Info(String::New((wchar_t *)(handle->data)));
+  delete[] (wchar_t *)(handle->data);
 }
 
 void warnUvAsyncCb(uv_async_t *handle, int status)
 {
-	console.Warn(String::New((wchar_t *)(handle->data)));
+  console.Warn(String::New((wchar_t *)(handle->data)));
+  delete[] (wchar_t *)(handle->data);
 }
 
 void errorUvAsyncCb(uv_async_t *handle, int status)
 {
-	console.Error(String::New((wchar_t *)(handle->data)));
+  console.Error(String::New((wchar_t *)(handle->data)));
+  delete[] (wchar_t *)(handle->data);
 }
 
