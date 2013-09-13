@@ -92,7 +92,7 @@ namespace NodeUtils
 
       HandleScope scope;
 
-      _console = Persistent<Object>::New(Context::GetCurrent()->Global()->Get(String::NewSymbol("console")).As<Object>());
+      _console = Persistent<Object>::New(v8::Context::GetCurrent()->Global()->Get(String::NewSymbol("console")).As<Object>());
       if (!_console.IsEmpty())
       {
         _log = Persistent<Function>::New(_console->Get(String::NewSymbol("log")).As<Function>());
