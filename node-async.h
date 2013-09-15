@@ -114,7 +114,8 @@ namespace NodeUtils
       delete handle;
     }
 
-    static unsigned int GetMainThreadId() 
+    // Attributes goes to http://stackoverflow.com/a/1982200/1060807 (etan)
+    static unsigned int GetMainThreadId()
     {
       const std::shared_ptr<void> hThreadSnapshot(
         CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0), CloseHandle);
