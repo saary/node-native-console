@@ -31,7 +31,7 @@ namespace NodeUtils
     };
 
     template<typename TInput, typename TResult> 
-    static void Run(
+    static void __cdecl Run(
       std::shared_ptr<TInput> input, 
       std::function<void (Baton<TInput, TResult>*)> doWork, 
       std::function<void (Handle<Function> callback, Baton<TInput, TResult>*)> afterWork, 
@@ -50,7 +50,7 @@ namespace NodeUtils
       uv_queue_work(uv_default_loop(), &baton->request, AsyncWork<TInput, TResult>, AsyncAfter<TInput, TResult>);
     }
 
-    static void RunOnMain(
+    static void __cdecl RunOnMain(
       std::function<void ()> func)
     {
       static unsigned int uvMainThreadId = GetMainThreadId();
@@ -71,7 +71,7 @@ namespace NodeUtils
 
   private:
     template<typename TInput, typename TResult> 
-    static void AsyncWork(uv_work_t* req) 
+    static void __cdecl AsyncWork(uv_work_t* req) 
     {
       // No HandleScope!
 
@@ -84,7 +84,7 @@ namespace NodeUtils
     }
 
     template<typename TInput, typename TResult> 
-    static void AsyncAfter(uv_work_t* req, int status) 
+    static void __cdecl AsyncAfter(uv_work_t* req, int status) 
     {
       HandleScope scope;
       Baton<TInput, TResult>* baton = static_cast<Baton<TInput, TResult>*>(req->data);
@@ -106,7 +106,7 @@ namespace NodeUtils
     }
 
     // Called by run on main in case we are not running on the main thread
-    static void AsyncCb(uv_async_t *handle, int status)
+    static void __cdecl AsyncCb(uv_async_t *handle, int status)
     {
       auto func = static_cast<std::function<void ()>*>(handle->data);
       (*func)();
@@ -115,7 +115,7 @@ namespace NodeUtils
     }
 
     // Attributes goes to http://stackoverflow.com/a/1982200/1060807 (etan)
-    static unsigned int GetMainThreadId()
+    static unsigned int __cdecl GetMainThreadId()
     {
       const std::shared_ptr<void> hThreadSnapshot(
         CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0), CloseHandle);
