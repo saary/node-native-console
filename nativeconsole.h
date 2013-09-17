@@ -23,10 +23,10 @@ namespace NodeUtils
     }
 
     // may be called from main thread or worker threads / RT event threads
-    void Log(const wchar_t *wstr) { Async::RunOnMain([&] { Log(_log, wstr); }); }
-    void Info(const wchar_t *wstr) { Async::RunOnMain([&] { Log(_info, wstr); }); }
-    void Warn(const wchar_t *wstr) { Async::RunOnMain([&] { Log(_warn, wstr); }); }
-    void Error(const wchar_t *wstr) { Async::RunOnMain([&] { Log(_error, wstr); }); }
+    void Log(const wchar_t *wstr) { Async::RunOnMain([&, wstr] { Log(_log, wstr); }); }
+    void Info(const wchar_t *wstr) { Async::RunOnMain([&, wstr] { Log(_info, wstr); }); }
+    void Warn(const wchar_t *wstr) { Async::RunOnMain([&, wstr] { Log(_warn, wstr); }); }
+    void Error(const wchar_t *wstr) { Async::RunOnMain([&, wstr] { Log(_error, wstr); }); }
 
     void ConnectToJSConsole()
     {
