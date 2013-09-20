@@ -50,8 +50,7 @@ namespace NodeUtils
       uv_queue_work(uv_default_loop(), &baton->request, AsyncWork<TInput, TResult>, AsyncAfter<TInput, TResult>);
     }
 
-    static void __cdecl RunOnMain(
-      std::function<void ()> func)
+    static void __cdecl RunOnMain(std::function<void ()> func)
     {
       static unsigned int uvMainThreadId = GetMainThreadId();
 
@@ -69,6 +68,18 @@ namespace NodeUtils
       }
     }
 
+	// defers execution of the provided function by creating an idler
+	// that means, the function will be invoked once the event loop has delivered
+	// all pending events.
+	static void __cdecl NextTick(std::function<void ()> func)
+	{
+	  uv_idle_t *idler = new uv_idle_t;
+	  std::function<void ()> *funcCopy = new std::function<void ()>(func);
+	  idler->data = (void *)funcCopy;
+	  uv_idle_init(uv_default_loop(), idler);
+	  uv_idle_start(idler, onNextTick);
+	}
+
   private:
     template<typename TInput, typename TResult> 
     static void __cdecl AsyncWork(uv_work_t* req) 
@@ -82,6 +93,7 @@ namespace NodeUtils
       // Set baton->result with a final result object
       baton->doWork(baton);
     }
+
 
     template<typename TInput, typename TResult> 
     static void __cdecl AsyncAfter(uv_work_t* req, int status) 
@@ -141,5 +153,15 @@ namespace NodeUtils
       }
       return result;
     }
+
+	static void __cdecl onNextTick(uv_idle_t *handle, int status)
+	{
+	  std::function<void ()> *func = static_cast<std::function<void ()> *>(handle->data);
+	  (*func)();
+	  delete func;
+	  uv_idle_stop(handle);
+	  delete handle;
+	}
   };
 }
+
