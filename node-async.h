@@ -1,13 +1,18 @@
 #pragma once
 
 #include <v8.h>
+#include <TlHelp32.h>
+
 #include <functional>
 #include <memory>
-#include <TlHelp32.h>
+#include <vector>
 
 namespace NodeUtils
 {
   using namespace v8;
+
+  const char* CALLBACK_PROPERTY_NAME = "callback";
+  const char* DOMAIN_PROPERTY_NAME = "domain";
 
   class Async
   {
@@ -20,12 +25,18 @@ namespace NodeUtils
       // Custom data
       std::shared_ptr<TInput> data;
       std::shared_ptr<TResult> result;
+      std::vector<Persistent<Value>> callback_argv;
+
+      void setCallbackArgv(Persistent<Value>* argv, int argc)
+      {
+        callback_argv = std::vector<Persistent<Value>>(argv, argv + argc);
+      }
 
     private:
       uv_work_t request;
       std::function<void (Baton*)> doWork;
-      std::function<void (Handle<Function> callback, Baton*)> afterWork;
-      Persistent<Function> callback;
+      std::function<void (Baton*)> afterWork;
+      Persistent<Object> callbackData;
 
       friend Async;
     };
@@ -34,14 +45,34 @@ namespace NodeUtils
     static void __cdecl Run(
       std::shared_ptr<TInput> input, 
       std::function<void (Baton<TInput, TResult>*)> doWork, 
-      std::function<void (Handle<Function> callback, Baton<TInput, TResult>*)> afterWork, 
+      std::function<void (Baton<TInput, TResult>*)> afterWork, 
       Handle<Function> callback)
     {
       HandleScope scope;
 
+      Handle<Object> callbackData;
+      
+      if (!callback.IsEmpty() && !callback->Equals(Undefined()))
+      {
+        callbackData = Object::New();
+        
+        callbackData->Set(String::NewSymbol(CALLBACK_PROPERTY_NAME), callback);
+      
+        // get the current domain:
+        Handle<Value> currentDomain = Undefined();
+
+        Handle<Object> process = Context::GetCurrent()->Global()->Get(String::NewSymbol("process")).As<Object>();
+        if (!process->Equals(Undefined()))
+        {
+          currentDomain = process->Get(String::NewSymbol("domain")) ;
+        }
+
+        callbackData->Set(String::NewSymbol(DOMAIN_PROPERTY_NAME), currentDomain);
+      }
+
       Baton<TInput, TResult>* baton = new Baton<TInput, TResult>();
       baton->request.data = baton;
-      baton->callback = Persistent<Function>::New(callback);
+      baton->callbackData = Persistent<Object>::New(callbackData);
       baton->error_code = 0;
       baton->data = input;
       baton->doWork = doWork;
@@ -111,9 +142,15 @@ namespace NodeUtils
       //    // Call callback with results.
       //}
 
-      baton->afterWork(baton->callback, baton);
+      baton->afterWork(baton);
+      
+      if (!baton->callbackData.IsEmpty() || !baton->callbackData->Equals(Undefined()))
+      {
+        // call the callback, using domains and all
+        node::MakeCallback(baton->callbackData, String::NewSymbol(CALLBACK_PROPERTY_NAME), static_cast<int>(baton->callback_argv.size()), baton->callback_argv.data());
+      }
 
-      baton->callback.Dispose();
+      baton->callbackData.Dispose();
       delete baton;
     }
 
