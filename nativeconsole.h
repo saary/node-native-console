@@ -84,9 +84,8 @@ namespace NodeUtils
       {
         
         HandleScope scope;
-        const unsigned argc = 1;
-        Local<Value> argv[argc] = { Local<Value>::New(str) };
-        node::MakeCallback(_console, logFunctionSymbol, argc, argv);
+        Local<Value> argv[] = { Local<Value>::New(str) };
+        node::MakeCallback(_console, logFunctionSymbol, _countof(argv), argv);
       }
     }
 
