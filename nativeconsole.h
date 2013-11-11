@@ -49,7 +49,7 @@ namespace NodeUtils
 
       if (!currentDomain.IsEmpty() && !currentDomain->Equals(Undefined())) 
       {
-        _console->Set(String::NewSymbol(DOMAIN_PROPERTY_NAME), currentDomain);
+        _console->Set(String::NewSymbol("domain"), currentDomain);
       }
 
       if (!_console.IsEmpty())
