@@ -24,9 +24,12 @@ namespace NodeUtils
       std::shared_ptr<TResult> result;
       std::vector<Persistent<Value>> callback_args;
 
-      void setCallbackArgs(Persistent<Value>* argv, int argc)
+      void setCallbackArgs(Handle<Value>* argv, int argc)
       {
-        callback_args = std::vector<Persistent<Value>>(argv, argv + argc);
+        for (int i=0; i<argc; i++)
+        {
+          callback_args.push_back(Persistent<Value>::New(argv[i]));
+        }
       }
 
     private:
@@ -45,7 +48,8 @@ namespace NodeUtils
       std::shared_ptr<TInput> input, 
       std::function<void (Baton<TInput, TResult>*)> doWork, 
       std::function<void (Baton<TInput, TResult>*)> afterWork, 
-      Handle<Function> callback)
+      Handle<Function> callback,
+      Handle<Value> receiver = Handle<Value>())
     {
       HandleScope scope;
 
@@ -55,6 +59,11 @@ namespace NodeUtils
       {
         callbackData = Object::New();
         
+        if (!receiver.IsEmpty())
+        {
+          callbackData->SetPrototype(receiver);
+        }
+
         callbackData->Set(String::NewSymbol("callback"), callback);
       
         // get the current domain:
@@ -135,22 +144,28 @@ namespace NodeUtils
       //if (baton->error) 
       //{
       //  Handle<Value> err = Exception::Error(...);
-      //  Persistent<Value> argv[] = { Persistent<Value>::New(err) };
+      //  Handle<Value> argv[] = { err };
       //  baton->setCallbackArgs(argv, _countof(argv));
       //}
       //else
       //{
-      //  Persistent<Value> argv[] = { Persistent<Value>::New(Undefined()), Persistent<...>::New(...) };
+      //  Handle<Value> argv[] = { Undefined(), ... };
       //  baton->setCallbackArgs(argv, _countof(argv));
       //} 
-      
 
       baton->afterWork(baton);
       
       if (!baton->callbackData.IsEmpty() || !baton->callbackData->Equals(Undefined()))
       {
         // call the callback, using domains and all
-        node::MakeCallback(baton->callbackData, String::NewSymbol("callback"), static_cast<int>(baton->callback_args.size()), baton->callback_args.data());
+        int argc = static_cast<int>(baton->callback_args.size());
+        std::unique_ptr<Handle<Value>> handlesArr(new Handle<Value>[argc]);
+        for (int i=0; i < argc; i++)
+        {
+          handlesArr.get()[i] = baton->callback_args[i];
+        }
+
+        node::MakeCallback(baton->callbackData, String::NewSymbol("callback"), argc, handlesArr.get());
       }
 
       baton->callbackData.Dispose();
