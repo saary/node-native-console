@@ -156,14 +156,24 @@ namespace NodeUtils
       baton->callbackData.Dispose();
       delete baton;
     }
+    
+    // called after the async handle is closed in order to free it's memory
+    static void __cdecl AyncCloseCb(uv_handle_t* handle) 
+    {
+      if (handle != nullptr)
+      {
+        uv_async_t* async = reinterpret_cast<uv_async_t*>(handle);
+        delete async;
+      }
+    }
 
     // Called by run on main in case we are not running on the main thread
     static void __cdecl AsyncCb(uv_async_t *handle, int status)
     {
       auto func = static_cast<std::function<void ()>*>(handle->data);
       (*func)();
+      uv_close((uv_handle_t*)handle, AyncCloseCb);
       delete func;
-      delete handle;
     }
 
     // Attributes goes to http://stackoverflow.com/a/1982200/1060807 (etan)

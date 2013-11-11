@@ -82,7 +82,6 @@ namespace NodeUtils
     {
       if (!logFunctionSymbol.IsEmpty())
       {
-        
         HandleScope scope;
         Local<Value> argv[] = { Local<Value>::New(str) };
         node::MakeCallback(_console, logFunctionSymbol, _countof(argv), argv);
