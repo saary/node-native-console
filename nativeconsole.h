@@ -23,10 +23,10 @@ namespace NodeUtils
     }
 
     // may be called from main thread or worker threads / RT event threads
-    void Log(const wchar_t *wstr) { Async::RunOnMain([&, wstr] { Log(_log, wstr); }); }
-    void Info(const wchar_t *wstr) { Async::RunOnMain([&, wstr] { Log(_info, wstr); }); }
-    void Warn(const wchar_t *wstr) { Async::RunOnMain([&, wstr] { Log(_warn, wstr); }); }
-    void Error(const wchar_t *wstr) { Async::RunOnMain([&, wstr] { Log(_error, wstr); }); }
+    void Log(const wchar_t *wstr) const { Async::RunOnMain([&, wstr] { Log(_logSymbol, wstr); }); }
+    void Info(const wchar_t *wstr) const { Async::RunOnMain([&, wstr] { Log(_infoSymbol, wstr); }); }
+    void Warn(const wchar_t *wstr) const { Async::RunOnMain([&, wstr] { Log(_warnSymbol, wstr); }); }
+    void Error(const wchar_t *wstr) const { Async::RunOnMain([&, wstr] { Log(_errorSymbol, wstr); }); }
 
     void ConnectToJSConsole()
     {
@@ -34,13 +34,30 @@ namespace NodeUtils
 
       HandleScope scope;
 
-      _console = Persistent<Object>::New(v8::Context::GetCurrent()->Global()->Get(String::NewSymbol("console")).As<Object>());
+      _console = Persistent<Object>::New(Object::New());
+      _console->SetPrototype(v8::Context::GetCurrent()->Global()->Get(String::NewSymbol("console")).As<Object>());
+
+      // attach domain:
+      // get the current domain:
+      Handle<Value> currentDomain;
+
+      Handle<Object> process = Context::GetCurrent()->Global()->Get(String::NewSymbol("process")).As<Object>();
+      if (!process->Equals(Undefined()))
+      {
+        currentDomain = process->Get(String::NewSymbol("domain")) ;
+      }
+
+      if (!currentDomain.IsEmpty() && !currentDomain->Equals(Undefined())) 
+      {
+        _console->Set(String::NewSymbol("domain"), currentDomain);
+      }
+
       if (!_console.IsEmpty())
       {
-        _log = Persistent<Function>::New(_console->Get(String::NewSymbol("log")).As<Function>());
-        _info = Persistent<Function>::New(_console->Get(String::NewSymbol("info")).As<Function>());
-        _warn = Persistent<Function>::New(_console->Get(String::NewSymbol("warn")).As<Function>());
-        _error = Persistent<Function>::New(_console->Get(String::NewSymbol("error")).As<Function>());
+        _logSymbol = Persistent<String>::New(String::NewSymbol("log"));
+        _infoSymbol = Persistent<String>::New(String::NewSymbol("info"));
+        _warnSymbol = Persistent<String>::New(String::NewSymbol("warn"));
+        _errorSymbol = Persistent<String>::New(String::NewSymbol("error"));
       }
     }
 
@@ -48,37 +65,36 @@ namespace NodeUtils
     void Dispose()
     {
       _console.Dispose();
-      _log.Dispose();
-      _info.Dispose();
-      _warn.Dispose();
-      _error.Dispose();
+      _logSymbol.Dispose();
+      _infoSymbol.Dispose();
+      _warnSymbol.Dispose();
+      _errorSymbol.Dispose();
     }
 
-    void Log(Handle<Function>& logFunction, const wchar_t *wstr)
+    void Log(const Handle<String>& logFunctionSymbol, const wchar_t *wstr) const
     {
       HandleScope scope;
       Local<String> str = String::New(wstr);
-      Log(logFunction, str);
+      Log(logFunctionSymbol, str);
     }
 
-    void Log(Handle<Function>& logFunction, Handle<String>& str)
+    void Log(const Handle<String>& logFunctionSymbol, Handle<String>& str) const
     {
-      if (!logFunction.IsEmpty())
+      if (!logFunctionSymbol.IsEmpty())
       {
+        
         HandleScope scope;
-        const unsigned argc = 1;
-        Local<Value> argv[argc] = { Local<Value>::New(str) };
-
-        logFunction->Call(_console, argc, argv);
+        Local<Value> argv[] = { Local<Value>::New(str) };
+        node::MakeCallback(_console, logFunctionSymbol, _countof(argv), argv);
       }
     }
 
   private:
     Persistent<Object> _console;
-    Persistent<Function> _log;
-    Persistent<Function> _info;
-    Persistent<Function> _warn;
-    Persistent<Function> _error;
+    Persistent<String> _logSymbol;
+    Persistent<String> _infoSymbol;
+    Persistent<String> _warnSymbol;
+    Persistent<String> _errorSymbol;
   };
 }
 
