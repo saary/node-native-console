@@ -41,7 +41,7 @@ namespace NodeUtils
       // get the current domain:
       Handle<Value> currentDomain;
 
-      Handle<Object> process = Context::GetCurrent()->Global()->Get(String::NewSymbol("process")).As<Object>();
+      Handle<Object> process = v8::Context::GetCurrent()->Global()->Get(String::NewSymbol("process")).As<Object>();
       if (!process->Equals(Undefined()))
       {
         currentDomain = process->Get(String::NewSymbol("domain")) ;
