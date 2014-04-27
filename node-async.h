@@ -43,6 +43,14 @@ namespace NodeUtils
           callback_args.push_back(Persistent<Value>::New(argv[i]));
         }
       }
+      
+      virtual ~Baton()
+      {
+        for (std::vector<Persistent<Value>>::iterator it = callback_args.begin(); it != callback_args.end(); it++)
+        {
+          it->Dispose();
+        }
+      }
 
     private:
       uv_work_t request;
